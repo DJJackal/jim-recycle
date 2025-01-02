@@ -14,6 +14,7 @@ FiveM Custom QBCORE recycling script made by me from scratch
   - Can place them anywhere, doesn't have to be just one mining location
   - I opted for a drilling animation as opposed to the pickaxe swinging
   - Nicely animated for better immersion
+  - Custom Webhook for Alerts Added
 
 - NPC's spawn on the blip locations
   - These locations can also give third eye and select ones have context menus for selling points
