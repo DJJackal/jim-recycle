@@ -1,3 +1,28 @@
+local webhookURL = "XXXXXXXXXXXXXXXXXXXXXXXXXXXX" -- Replace with your webhook URL
+
+function sendWebhookMessage(webhook, message)
+    if webhook and webhook ~= "" then
+        PerformHttpRequest(webhook, function(err, text, headers) end, "POST", json.encode({content = message}), {["Content-Type"] = "application/json"})
+    else
+        print("No webhook URL configured.")
+    end
+end
+
+function sendEmbedToDiscord(webhook, title, description, color)
+    if webhook and webhook ~= "" then
+        local embed = {
+            {
+                ["title"] = title,
+                ["description"] = description,
+                ["color"] = color, -- Hex color in decimal format
+            }
+        }
+        PerformHttpRequest(webhook, function(err, text, headers) end, "POST", json.encode({embeds = embed}), {["Content-Type"] = "application/json"})
+    else
+        print("No webhook URL configured.")
+    end
+end
+
 AddEventHandler('onResourceStart', function(resource) if GetCurrentResourceName() ~= resource then return end
 	for k in pairs(Config.Prices) do if not Core.Shared.Items[k] then print("^5Debug^7: ^6Prices^7: ^2Missing Item from ^4QBCore^7.^4Shared^7.^4Items^7: '^6"..k.."^7'") end end
 	if not Core.Shared.Items["recyclablematerial"] then print("^5Debug^7: ^2Missing Item from ^4QBCore^7.^4Shared^7.^4Items^7: '^6recyclablematerial^7'") end
@@ -12,20 +37,41 @@ RegisterServerEvent("jim-recycle:DoorCharge", function()
 	else Core.Functions.GetPlayer(source).Functions.RemoveMoney("cash", Config.PayAtDoor) end
 end)
 
-RegisterServerEvent("jim-recycle:TradeItems", function(data)
+RegisterNetEvent("jim-recycle:TradeItems", function(data)
     local src = source
-	local table = {}
-	for i = 1, #Config.RecycleAmounts["Trade"] do
-		if Config.RecycleAmounts["Trade"][i].amount == data.amount then
-			table = Config.RecycleAmounts["Trade"][i]
-		end
-	end
-	TriggerEvent("jim-recycle:server:toggleItem", false, "recyclablematerial", data.amount, src)
-	Wait(1000)
-	for i = 1, table.itemGive do
-		TriggerEvent("jim-recycle:server:toggleItem", true, Config.TradeTable[math.random(1, #Config.TradeTable)], math.random(table.Min, table.Max), src)
-		Wait(100)
-	end
+    local recycleTable = {} -- Renamed from 'table'
+    local receivedItems = {} -- Table to track received items
+
+    for i = 1, #Config.RecycleAmounts["Trade"] do
+        if Config.RecycleAmounts["Trade"][i].amount == data.amount then
+            recycleTable = Config.RecycleAmounts["Trade"][i]
+        end
+    end
+
+    -- Remove recyclable material
+    TriggerEvent("jim-recycle:server:toggleItem", false, "recyclablematerial", data.amount, src)
+    Wait(1000)
+
+    -- Generate items
+    for i = 1, recycleTable.itemGive do
+        local itemName = Config.TradeTable[math.random(1, #Config.TradeTable)]
+        local itemCount = math.random(recycleTable.Min, recycleTable.Max)
+        TriggerEvent("jim-recycle:server:toggleItem", true, itemName, itemCount, src)
+        table.insert(receivedItems, {name = Core.Shared.Items[itemName].label, count = itemCount}) -- Add item to receivedItems table
+        Wait(100)
+    end
+
+    -- Build a string for the received items
+    local itemsDescription = ""
+    for _, item in pairs(receivedItems) do
+        itemsDescription = itemsDescription .. string.format("- %s x%d\n", item.name, item.count)
+    end
+
+    -- Webhook Notification
+    local Player = Core.Functions.GetPlayer(src)
+    local playerName = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname
+    local description = string.format("**Player:** %s\n**Recycled Amount:** %d\n**Received Items:**\n%s", playerName, data.amount, itemsDescription)
+    sendEmbedToDiscord(webhookURL, "Recycling Alert: Trade", description, 3447003) -- Blue color
 end)
 
 RegisterNetEvent("jim-recycle:Selling:Mat", function(data)
